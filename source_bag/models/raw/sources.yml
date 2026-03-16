@@ -1,0 +1,13 @@
+version: 1
+
+sources:
+  - name: datalake
+    schema: datalake
+    tables:
+      - name: source_bag_wpl
+      - name: source_bag_lig
+      - name: source_bag_num
+      - name: source_bag_opr
+      - name: source_bag_pnd
+      - name: source_bag_sta
+      - name: source_bag_vbo

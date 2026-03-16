@@ -1,0 +1,13 @@
+datalake_clean_layer:
+  target: dev
+  outputs:
+    dev:
+      type: databend
+      user: "{{ env_var('MYSQL_USER') }}"
+      pass: "{{ env_var('MYSQL_PASSWORD') }}"
+      host: "{{ env_var('MYSQL_TAILSCALE_HOST') }}"
+      port: 8000
+      schema: datalake
+      secure: false
+      protocol: mysql   # IMPORTANT: tells dbt to speak MySQL/TCP
+
