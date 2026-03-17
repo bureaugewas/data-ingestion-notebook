@@ -1,0 +1,139 @@
+name: Data Platform CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  RUN_NOTEBOOKS: "false"
+
+jobs:
+  detect-sources:
+    runs-on: ubuntu-latest
+    outputs:
+      changed_sources: ${{ steps.changed.outputs.changed_sources }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed sources
+        id: changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha || github.event.before }}"
+          HEAD_SHA="${{ github.sha }}"
+
+          echo "Diffing $BASE_SHA..$HEAD_SHA"
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA="$(git rev-parse "$HEAD_SHA^" 2>/dev/null || true)"
+          fi
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)
+          export CHANGED_FILES
+
+          CHANGED_SOURCES=$(python3 - <<'PY'
+          import json, os, re
+          changed_files = os.environ.get("CHANGED_FILES", "").splitlines()
+          sources = []
+          for f in changed_files:
+            if not f:
+              continue
+            top = f.split("/", 1)[0]
+            if re.match(r"^source_[a-z0-9_]+$", top) and top not in sources:
+              sources.append(top)
+          print(json.dumps(sources))
+          PY
+          )
+          echo "changed_sources=$CHANGED_SOURCES" >> "$GITHUB_OUTPUT"
+
+  validate:
+    if: github.event_name == 'pull_request' && needs.detect-sources.outputs.changed_sources != '[]'
+    needs: detect-sources
+    runs-on: ubuntu-latest
+    env:
+      DATABEND_HOST: ${{ secrets.DATABEND_HOST }}
+      DATABEND_PORT: ${{ secrets.DATABEND_PORT }}
+      DATABEND_USER: ${{ secrets.DATABEND_USER }}
+      DATABEND_PASSWORD: ${{ secrets.DATABEND_PASSWORD }}
+      DATABEND_SCHEMA: ${{ secrets.DATABEND_SCHEMA }}
+      DATABEND_DATABASE: ${{ secrets.DATABEND_DATABASE }}
+    strategy:
+      fail-fast: false
+      matrix:
+        source: ${{ fromJSON(needs.detect-sources.outputs.changed_sources) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r ${{ matrix.source }}/requirements.txt
+
+      - name: dbt build (dev)
+        env:
+          DBT_TARGET: dev
+        run: |
+          dbt build --project-dir ${{ matrix.source }} --profiles-dir ${{ matrix.source }}
+
+      - name: Execute notebook (optional)
+        if: env.RUN_NOTEBOOKS == 'true'
+        env:
+          DB_TARGET: databend
+        run: |
+          NOTEBOOK=$(ls ${{ matrix.source }}/ingestion_*.ipynb 2>/dev/null | head -n 1 || true)
+          if [ -n "$NOTEBOOK" ]; then
+            jupyter nbconvert --to notebook --execute "$NOTEBOOK" --output /tmp/executed.ipynb
+          fi
+
+  deploy:
+    if: github.event_name == 'push' && needs.detect-sources.outputs.changed_sources != '[]'
+    needs: detect-sources
+    runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+    strategy:
+      fail-fast: false
+      matrix:
+        source: ${{ fromJSON(needs.detect-sources.outputs.changed_sources) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r ${{ matrix.source }}/requirements.txt
+
+      - name: dbt build (prod)
+        env:
+          DBT_TARGET: prod
+        run: |
+          dbt build --project-dir ${{ matrix.source }} --profiles-dir ${{ matrix.source }}
+
+      - name: Execute notebook (Snowflake)
+        env:
+          DB_TARGET: snowflake
+        run: |
+          NOTEBOOK=$(ls ${{ matrix.source }}/ingestion_*.ipynb 2>/dev/null | head -n 1 || true)
+          if [ -n "$NOTEBOOK" ]; then
+            jupyter nbconvert --to notebook --execute "$NOTEBOOK" --output /tmp/executed.ipynb
+          fi
