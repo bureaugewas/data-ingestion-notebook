@@ -17,7 +17,12 @@ echo ".env" >> .gitignore
 
 dbt init
 
-Set env variables for dbt
+# Set env variables for dbt
 export $(grep -v '^#' .env | xargs)
 
 pip3 install "setuptools<68"  
+
+
+# Github pipeline
+mkdir -p .github/workflows
+nano .github/workflows/ci.yml
