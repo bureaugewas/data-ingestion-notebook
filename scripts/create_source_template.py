@@ -43,6 +43,31 @@ SNOWFLAKE_DEV_AUTHENTICATOR=externalbrowser
 # SNOWFLAKE_PROD_PRIVATE_KEY=
 # SNOWFLAKE_PROD_PRIVATE_KEY_PASSPHRASE=
 """
+SNOWFLAKE_TASK_TEMPLATE = """USE DATABASE DATALAKE;
+USE SCHEMA SOURCE_{slug_upper};
+
+-- Snowflake task to run the notebook + dbt project on a schedule.
+-- Replace the placeholders below to match your DBT project location.
+CREATE OR REPLACE TASK RUN_NOTEBOOK_SOURCE_{slug_upper}
+  WAREHOUSE = CICD_WAREHOUSE
+  SCHEDULE = 'USING CRON 0 6 * * * UTC'
+  USER_TASK_TIMEOUT_MS = 14400000
+  EXECUTE AS USER "CICD_USER_ROLE"
+AS
+  EXECUTE NOTEBOOK "SOURCE_{slug_upper}"."INGESTION_{slug_upper}";
+
+CREATE OR REPLACE TASK DBT_PROJECT_SOURCE_{slug_upper}
+  WAREHOUSE = CICD_WAREHOUSE
+  AFTER RUN_NOTEBOOK_SOURCE_{slug_upper}
+  USER_TASK_TIMEOUT_MS = 14400000
+  EXECUTE AS USER "CICD_USER_ROLE"
+AS
+  EXECUTE DBT PROJECT "DATALAKE"."SOURCE_{slug_upper}"."SOURCE_{slug_upper}"
+  ARGS = 'run';
+
+ALTER TASK RUN_NOTEBOOK_SOURCE_{slug_upper} RESUME;
+ALTER TASK RUN_DBT_PROJECT_SOURCE_{slug_upper} RESUME;
+"""
 
 
 def slugify(name: str) -> str:
@@ -83,6 +108,7 @@ def replace_content(dst: Path, slug: str) -> None:
         ("source_bag_", f"source_{slug}_"),
         ("stg__bag_", f"stg__{slug}_"),
         ("ingestion_bag", f"ingestion_{slug}"),
+        ("INGESTION_BAG", f"INGESTION_{slug.upper()}"),
         ("source_bag", f"source_{slug}"),
     ]
 
@@ -221,6 +247,18 @@ def update_notebook_template(dst: Path, slug: str) -> None:
     notebook_path.write_text(json.dumps(notebook, indent=2), encoding="utf-8")
 
 
+def ensure_snowflake_task_file(dst: Path, slug: str) -> None:
+    task_path = dst / "snowflake_task.sql"
+    if task_path.exists():
+        return
+    task_path.write_text(
+        SNOWFLAKE_TASK_TEMPLATE.format(
+            slug_upper=slug.upper(),
+        ),
+        encoding="utf-8",
+    )
+
+
 def create_venv(dst: Path) -> None:
     venv_path = dst / ".venv"
     if venv_path.exists():
@@ -258,6 +296,7 @@ def main() -> None:
     replace_content(dst, slug)
     ensure_env_file(dst, slug)
     update_notebook_template(dst, slug)
+    ensure_snowflake_task_file(dst, slug)
     create_venv(dst)
 
     print(f"Created template at {dst}")
