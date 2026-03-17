@@ -3,8 +3,34 @@ import re
 import shutil
 from pathlib import Path
 import json
+import subprocess
+import sys
 
 TEMPLATE_DIR = Path("source_bag")
+ENV_TEMPLATE = """DBT_TARGET=dev
+DB_TARGET=databend
+SOURCE_NAME={slug}
+
+# To load these variables in your shell:
+# export $(grep -v '^#' .env | xargs)
+
+# Databend (dev)
+DATABEND_HOST=
+DATABEND_PORT=8000
+DATABEND_USER=
+DATABEND_PASSWORD=
+DATABEND_SCHEMA=
+DATABEND_DATABASE=
+
+# Snowflake (prod)
+SNOWFLAKE_ACCOUNT=
+SNOWFLAKE_USER=
+SNOWFLAKE_PASSWORD=
+SNOWFLAKE_ROLE=
+SNOWFLAKE_WAREHOUSE=
+SNOWFLAKE_DATABASE=DATALAKE
+SNOWFLAKE_SCHEMA=
+"""
 
 
 def slugify(name: str) -> str:
@@ -48,16 +74,29 @@ def replace_content(dst: Path, slug: str) -> None:
         ("source_bag", f"source_{slug}"),
     ]
 
-    text_exts = {".yml", ".yaml", ".sql", ".md", ".ipynb", ".txt"}
+    text_exts = {".yml", ".yaml", ".sql", ".md", ".ipynb", ".txt", ".gitignore"}
     for path in dst.rglob("*"):
         if not path.is_file():
             continue
-        if path.suffix not in text_exts:
+        if path.suffix not in text_exts and path.name not in text_exts:
             continue
         content = path.read_text(encoding="utf-8")
         for old, new in replacements:
             content = content.replace(old, new)
         path.write_text(content, encoding="utf-8")
+
+
+def ensure_env_file(dst: Path, slug: str) -> None:
+    env_path = dst / ".env"
+    if env_path.exists():
+        return
+
+    env_example = dst / ".env.example"
+    if env_example.exists():
+        env_example.rename(env_path)
+        return
+
+    env_path.write_text(ENV_TEMPLATE.format(slug=slug), encoding="utf-8")
 
 
 def update_notebook_template(dst: Path, slug: str) -> None:
@@ -66,7 +105,7 @@ def update_notebook_template(dst: Path, slug: str) -> None:
         return
 
     title = f"Ingestion Notebook - {slug}"
-    table_name = f"source_{slug}_records"
+    table_name = f"source_{slug}_test_table"
 
     cells = [
         {
@@ -75,7 +114,7 @@ def update_notebook_template(dst: Path, slug: str) -> None:
             "source": [
                 f"# {title}\n",
                 "This notebook is a clean starting point for building a source ingestion.\n",
-                "It is safe to run as-is because `DRY_RUN` is enabled by default.\n",
+                "It creates a small test table by default so you can verify connectivity.\n",
             ],
         },
         {
@@ -104,8 +143,8 @@ def update_notebook_template(dst: Path, slug: str) -> None:
             "cell_type": "markdown",
             "metadata": {},
             "source": [
-                "## Template Script (Safe by Default)\n",
-                "Includes an **empty row** example and a `DRY_RUN` switch so you can run without inserting anything.\n",
+                "## Template Script (Runs Live)\n",
+                "Includes an **empty row** example and performs a real insert into the test table.\n",
             ],
         },
         {
@@ -123,29 +162,29 @@ def update_notebook_template(dst: Path, slug: str) -> None:
                 ")\n",
                 "\n",
                 f"TABLE_NAME = \"{table_name}\"\n",
-                "DRY_RUN = True  # Set to False to actually insert and finalize\n",
+                "\n",
+                "def drop_table(cursor, table_name):\n",
+                "    cursor.execute(f\"DROP TABLE IF EXISTS {table_name}\")\n",
                 "\n",
                 "example_rows = [\n",
                 "    {\"example\": \"value\"},\n",
                 "    {},  # empty row example\n",
                 "]\n",
                 "\n",
-                "if DRY_RUN:\n",
-                "    print(\"DRY_RUN enabled -- no database calls will be made.\")\n",
-                "    print(f\"Would insert {len(example_rows)} rows into {TABLE_NAME}_tmp\")\n",
-                "    print(\"Empty row payload:\", example_rows[1])\n",
-                "else:\n",
-                "    conn = get_connection()\n",
-                "    cursor = conn.cursor()\n",
+                "conn = get_connection()\n",
+                "cursor = conn.cursor()\n",
                 "\n",
-                "    ensure_schema(cursor)\n",
-                "    ensure_tables(cursor, TABLE_NAME)\n",
+                "ensure_schema(cursor)\n",
+                "ensure_tables(cursor, TABLE_NAME)\n",
                 "\n",
-                "    insert_batch(cursor, TABLE_NAME, example_rows)\n",
-                "    finalize_table(cursor, TABLE_NAME)\n",
+                "insert_batch(cursor, TABLE_NAME, example_rows)\n",
+                "finalize_table(cursor, TABLE_NAME)\n",
                 "\n",
-                "    conn.commit()\n",
-                "    print(\"Inserted rows and finalized table.\")\n",
+                "conn.commit()\n",
+                "print(\"Inserted rows and finalized table.\")\n",
+                "\n",
+                "# Uncomment to drop the test table after running.\n",
+                "# drop_table(cursor, TABLE_NAME)\n",
             ],
         },
     ]
@@ -170,6 +209,23 @@ def update_notebook_template(dst: Path, slug: str) -> None:
     notebook_path.write_text(json.dumps(notebook, indent=2), encoding="utf-8")
 
 
+def create_venv(dst: Path) -> None:
+    venv_path = dst / ".venv"
+    if venv_path.exists():
+        return
+
+    subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
+
+    if sys.platform == "win32":
+        python_bin = venv_path / "Scripts" / "python"
+    else:
+        python_bin = venv_path / "bin" / "python"
+
+    req_file = dst / "requirements.txt"
+    if req_file.exists():
+        subprocess.run([str(python_bin), "-m", "pip", "install", "-r", str(req_file)], check=True)
+
+
 def main() -> None:
     import sys
 
@@ -186,12 +242,11 @@ def main() -> None:
         raise SystemExit(f"Template not found: {TEMPLATE_DIR}")
 
     copy_template(dst)
-    env_example = dst / ".env.example"
-    if env_example.exists():
-        env_example.rename(dst / ".env")
     rename_files(dst, slug)
     replace_content(dst, slug)
+    ensure_env_file(dst, slug)
     update_notebook_template(dst, slug)
+    create_venv(dst)
 
     print(f"Created template at {dst}")
 
