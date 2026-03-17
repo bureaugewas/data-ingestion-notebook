@@ -26,11 +26,22 @@ def get_connection():
         import snowflake.connector
 
         return snowflake.connector.connect(
-            account=os.environ["SNOWFLAKE_ACCOUNT"],
-            user=os.environ["SNOWFLAKE_USER"],
-            password=os.environ["SNOWFLAKE_PASSWORD"],
-            role=os.environ.get("SNOWFLAKE_ROLE"),
-            warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE"),
+            account=os.environ.get("SNOWFLAKE_DEV_ACCOUNT")
+            or os.environ.get("SNOWFLAKE_ACCOUNT"),
+            user=os.environ.get("SNOWFLAKE_DEV_USER")
+            or os.environ.get("SNOWFLAKE_USER"),
+            password=os.environ.get("SNOWFLAKE_PASSWORD"),
+            role=os.environ.get("SNOWFLAKE_DEV_ROLE")
+            or os.environ.get("SNOWFLAKE_ROLE"),
+            warehouse=os.environ.get("SNOWFLAKE_DEV_WAREHOUSE")
+            or os.environ.get("SNOWFLAKE_WAREHOUSE"),
+            database=os.environ.get("SNOWFLAKE_DEV_DATABASE")
+            or os.environ.get("SNOWFLAKE_DATABASE"),
+            schema=os.environ.get("SNOWFLAKE_DEV_SCHEMA")
+            or os.environ.get("SNOWFLAKE_SCHEMA"),
+            authenticator=os.environ.get(
+                "SNOWFLAKE_DEV_AUTHENTICATOR", "externalbrowser"
+            ),
         )
 
     import pymysql

@@ -94,7 +94,7 @@ jobs:
       - name: dbt build (snowflake dev)
         if: env.DB_TARGET == 'snowflake'
         env:
-          DBT_TARGET: dev
+          DBT_TARGET: sso-dev-snowflake
         run: |
           dbt build --project-dir ${{ matrix.source }} --profiles-dir ${{ matrix.source }}
 
@@ -139,7 +139,7 @@ jobs:
 
       - name: dbt build (prod)
         env:
-          DBT_TARGET: prod
+          DBT_TARGET: prod-snowflake
         run: |
           dbt build --project-dir ${{ matrix.source }} --profiles-dir ${{ matrix.source }}
 
