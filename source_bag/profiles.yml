@@ -1,7 +1,7 @@
 source_bag:
-  target: "{{ env_var('DBT_TARGET', 'dev') }}"
+  target: "{{ env_var('DBT_TARGET', 'dev-databend') }}"
   outputs:
-    dev:
+    dev-databend:
       type: databend
       user: "{{ env_var('DATABEND_USER') }}"
       pass: "{{ env_var('DATABEND_PASSWORD') }}"
@@ -10,14 +10,26 @@ source_bag:
       schema: "{{ env_var('DATABEND_SCHEMA', 'datalake') }}"
       secure: false
       protocol: mysql
-    prod:
+    sso-dev-snowflake:
       type: snowflake
-      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
-      user: "{{ env_var('SNOWFLAKE_USER') }}"
-      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
-      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
-      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
-      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
-      schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
+      account: "{{ env_var('SNOWFLAKE_DEV_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_DEV_USER') }}"
+      role: "{{ env_var('SNOWFLAKE_DEV_ROLE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_DEV_WAREHOUSE') }}"
+      database: "{{ env_var('SNOWFLAKE_DEV_DATABASE') }}"
+      schema: "{{ env_var('SNOWFLAKE_DEV_SCHEMA') }}"
+      authenticator: "{{ env_var('SNOWFLAKE_DEV_AUTHENTICATOR', 'externalbrowser') }}"
+      threads: 4
+      client_session_keep_alive: false
+    prod-snowflake:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_PROD_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_PROD_USER') }}"
+      role: "{{ env_var('SNOWFLAKE_PROD_ROLE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_PROD_WAREHOUSE') }}"
+      database: "{{ env_var('SNOWFLAKE_PROD_DATABASE') }}"
+      schema: "{{ env_var('SNOWFLAKE_PROD_SCHEMA') }}"
+      private_key: "{{ env_var('SNOWFLAKE_PROD_PRIVATE_KEY') }}"
+      private_key_passphrase: "{{ env_var('SNOWFLAKE_PROD_PRIVATE_KEY_PASSPHRASE', '') }}"
       threads: 4
       client_session_keep_alive: false
