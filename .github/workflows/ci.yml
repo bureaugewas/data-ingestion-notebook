@@ -55,12 +55,20 @@ jobs:
     needs: detect-sources
     runs-on: ubuntu-latest
     env:
-      DATABEND_HOST: ${{ secrets.DATABEND_HOST }}
-      DATABEND_PORT: ${{ secrets.DATABEND_PORT }}
-      DATABEND_USER: ${{ secrets.DATABEND_USER }}
-      DATABEND_PASSWORD: ${{ secrets.DATABEND_PASSWORD }}
-      DATABEND_SCHEMA: ${{ secrets.DATABEND_SCHEMA }}
-      DATABEND_DATABASE: ${{ secrets.DATABEND_DATABASE }}
+      DB_TARGET: ${{ vars.DB_TARGET || 'databend' }}
+      DATABEND_HOST: ${{ secrets.DATABEND_HOST || 'localhost' }}
+      DATABEND_DBT_PORT: ${{ secrets.DATABEND_DBT_PORT || secrets.DATABEND_PORT || '8000' }}
+      DATABEND_USER: ${{ secrets.DATABEND_USER || 'user' }}
+      DATABEND_PASSWORD: ${{ secrets.DATABEND_PASSWORD || 'password' }}
+      DATABEND_SCHEMA: ${{ secrets.DATABEND_SCHEMA || 'datalake' }}
+      DATABEND_DATABASE: ${{ secrets.DATABEND_DATABASE || 'datalake' }}
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
     strategy:
       fail-fast: false
       matrix:
@@ -78,16 +86,25 @@ jobs:
         run: |
           pip install -r ${{ matrix.source }}/requirements.txt
 
-      - name: dbt build (dev)
+      - name: dbt validate (databend offline)
+        if: env.DB_TARGET != 'snowflake'
+        env:
+          DBT_TARGET: dev
+        run: |
+          dbt parse --project-dir ${{ matrix.source }} --profiles-dir ${{ matrix.source }}
+          dbt compile --project-dir ${{ matrix.source }} --profiles-dir ${{ matrix.source }}
+
+      - name: dbt build (snowflake dev)
+        if: env.DB_TARGET == 'snowflake'
         env:
           DBT_TARGET: dev
         run: |
           dbt build --project-dir ${{ matrix.source }} --profiles-dir ${{ matrix.source }}
 
       - name: Execute notebook (optional)
-        if: env.RUN_NOTEBOOKS == 'true'
+        if: env.RUN_NOTEBOOKS == 'true' && env.DB_TARGET == 'snowflake'
         env:
-          DB_TARGET: databend
+          DB_TARGET: snowflake
         run: |
           NOTEBOOK=$(ls ${{ matrix.source }}/ingestion_*.ipynb 2>/dev/null | head -n 1 || true)
           if [ -n "$NOTEBOOK" ]; then

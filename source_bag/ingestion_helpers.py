@@ -37,7 +37,10 @@ def get_connection():
 
     return pymysql.connect(
         host=os.environ["DATABEND_HOST"],
-        port=int(os.environ.get("DATABEND_PORT", "8000")),
+        port=int(
+            os.environ.get("DATABEND_HTML_PORT")
+            or os.environ.get("DATABEND_PORT", "3307")
+        ),
         user=os.environ["DATABEND_USER"],
         password=os.environ["DATABEND_PASSWORD"],
     )

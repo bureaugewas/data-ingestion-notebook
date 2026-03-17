@@ -6,7 +6,7 @@ source_bag:
       user: "{{ env_var('DATABEND_USER') }}"
       pass: "{{ env_var('DATABEND_PASSWORD') }}"
       host: "{{ env_var('DATABEND_HOST') }}"
-      port: "{{ env_var('DATABEND_PORT', '8000') | int }}"
+      port: "{{ env_var('DATABEND_DBT_PORT', '8000') | int }}"
       schema: "{{ env_var('DATABEND_SCHEMA', 'datalake') }}"
       secure: false
       protocol: mysql
