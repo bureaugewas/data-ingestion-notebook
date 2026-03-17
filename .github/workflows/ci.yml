@@ -16,7 +16,7 @@ jobs:
       changed_sources: ${{ steps.changed.outputs.changed_sources }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -67,10 +67,10 @@ jobs:
         source: ${{ fromJSON(needs.detect-sources.outputs.changed_sources) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -112,10 +112,10 @@ jobs:
         source: ${{ fromJSON(needs.detect-sources.outputs.changed_sources) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
