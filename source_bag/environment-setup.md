@@ -1,11 +1,10 @@
 python3 -m venv .venv
 
 pip3 install dbt-core
-
-pip3 install dbt-postgres
-pip3 install dbt-bigquery
 pip3 install dbt-snowflake
 pip3 install dbt-databend-cloud
+pip3 install snowflake-connector-python pymysql python-dotenv
+pip3 install jupyter nbconvert papermill
 
 dbt --version
 
@@ -17,6 +16,8 @@ echo ".env" >> .gitignore
 
 dbt init
 
+# Create env file
+cp .env.example .env
 # Set env variables for dbt
 export $(grep -v '^#' .env | xargs)
 

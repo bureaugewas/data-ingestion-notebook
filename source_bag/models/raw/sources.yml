@@ -2,7 +2,7 @@ version: 1
 
 sources:
   - name: datalake
-    schema: datalake
+    schema: "{{ target.schema }}"
     tables:
       - name: source_bag_wpl
       - name: source_bag_lig

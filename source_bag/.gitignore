@@ -3,3 +3,4 @@ tmp/
 target/
 launch.json
 dbt.log
+source_bag/

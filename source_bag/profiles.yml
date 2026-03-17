@@ -1,13 +1,23 @@
-datalake_clean_layer:
-  target: dev
+source_bag:
+  target: "{{ env_var('DBT_TARGET', 'dev') }}"
   outputs:
     dev:
       type: databend
-      user: "{{ env_var('MYSQL_USER') }}"
-      pass: "{{ env_var('MYSQL_PASSWORD') }}"
-      host: "{{ env_var('MYSQL_TAILSCALE_HOST') }}"
-      port: 8000
-      schema: datalake
+      user: "{{ env_var('DATABEND_USER') }}"
+      pass: "{{ env_var('DATABEND_PASSWORD') }}"
+      host: "{{ env_var('DATABEND_HOST') }}"
+      port: "{{ env_var('DATABEND_PORT', '8000') | int }}"
+      schema: "{{ env_var('DATABEND_SCHEMA', 'datalake') }}"
       secure: false
-      protocol: mysql   # IMPORTANT: tells dbt to speak MySQL/TCP
-
+      protocol: mysql
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
+      threads: 4
+      client_session_keep_alive: false
