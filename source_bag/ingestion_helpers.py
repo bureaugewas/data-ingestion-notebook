@@ -82,14 +82,18 @@ def ensure_tables(cursor, table_name):
         )
         """
     )
+    reset_tmp_table(cursor, table_name)
+
+
+def reset_tmp_table(cursor, table_name):
+    cursor.execute(f"DROP TABLE IF EXISTS {table_name}_tmp")
     cursor.execute(
         f"""
-        CREATE TABLE IF NOT EXISTS {table_name}_tmp (
+        CREATE TABLE {table_name}_tmp (
             record_content VARIANT
         )
         """
     )
-    cursor.execute(f"TRUNCATE TABLE {table_name}_tmp")
 
 
 def insert_batch(cursor, table_name, json_set, timeout_seconds=30):
@@ -123,3 +127,4 @@ def insert_batch(cursor, table_name, json_set, timeout_seconds=30):
 def finalize_table(cursor, table_name):
     cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
     cursor.execute(f"ALTER TABLE {table_name}_tmp RENAME TO {table_name}")
+    reset_tmp_table(cursor, table_name)
