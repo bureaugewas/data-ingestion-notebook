@@ -1,0 +1,6 @@
+dbt-core
+dbt-snowflake
+dbt-databend-cloud
+snowflake-connector-python
+pymysql
+python-dotenv

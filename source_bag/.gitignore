@@ -1,4 +1,6 @@
 tmp/
+.venv/
+.vscode/
 .env
 target/
 launch.json
